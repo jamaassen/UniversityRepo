@@ -37,12 +37,14 @@ def file_reader(path, num_fields, sep=',', header=False):
 
 class Student:
     ''' this class stores information about a student'''
-    def __init__(self, CWID, name, major):
+    def __init__(self, CWID, name, major, required, electives):
         '''Student Constructor'''
         self._CWID = CWID
         self._name = name
         self._major = major
-        self._classes = {}  # key = UPPER course string, value = grade string
+        self._courses = {}  # key = UPPER course string, value = grade string
+        self._required = required
+        self._electives = electives
 
     def __eq__(self, other):
         ''' return True/False if the two Students are equivalent '''
@@ -51,19 +53,25 @@ class Student:
     @staticmethod
     def get_field_names():
         '''This function provides the labels for the fields that are returned in get_summary()'''
-        return ('CWID', 'Name', 'Completed Courses')
+        return ('CWID', 'Name', 'Major', 'Completed Courses', 'Reamining Required', 'Reamining Electives')
 
     def get_summary(self):
         '''This function provides a summary of student information. Fields are as defined in get_field_names()'''
-        return (self._CWID, self._name, sorted(self._classes.keys()))
+        passing_grade = ('A', 'A-', 'B+', 'B', 'B-', 'C+', 'C')
+        completed = sorted(course for course, grade in self._courses.items() if grade in passing_grade)
+        remaining = self._required - {course for course, grade in self._courses.items() if grade in passing_grade}
+        electives = self._electives.intersection({course for course, grade in self._courses.items() if grade in passing_grade})
+        return (self._CWID, self._name, self._major, completed,
+                remaining if any(remaining) else 'None',
+                'None' if any(electives) else self._electives)
 
     def add_course(self, course, grade):
         '''adds a course and grade to the student's course list. Returns True if this is new course for the student, False if they already had it'''
-        if course in self._classes:
-            self._classes[course] = grade
+        if course in self._courses:
+            self._courses[course] = grade
             return False
         else:
-            self._classes[course] = grade
+            self._courses[course] = grade
             return True
 
 
@@ -116,6 +124,12 @@ class Major:
         else:
             raise ValueError(f'Invalid course type "{course_type}" provided')
 
+    def get_required(self):
+        return self._required
+
+    def get_electives(self):
+        return self._electives
+
     def get_summary(self):
         '''This function provides a summary of Major information. Fields are as defined in get_field_names()'''
         return (self.name, sorted(self._required), sorted(self._electives))
@@ -139,15 +153,15 @@ class University:
         if not os.path.isdir(path):
             raise FileNotFoundError(f"{os.path.abspath(path)} is not a valid directory")
 
+        self.import_majors()
         self.import_students()
         self.import_instructors()
         self.import_grades()
-        self.import_majors()
 
     def import_students(self):
         '''this function scans students.txt in the given path of the univeristy for valid students and adds them to the repository'''
         for CWID, name, major in file_reader(os.path.join(self.path, 'students.txt'), 3, '\t'):
-            self._students[CWID] = Student(CWID, name.title(), major.upper())
+            self._students[CWID] = Student(CWID, name.title(), major.upper(), self._majors[major.upper()].get_required(), self._majors[major.upper()].get_electives())
 
     def import_instructors(self):
         '''this function scans instructors.txt in the given path of the univeristy for valid instructors and adds them to the repository'''
@@ -158,7 +172,7 @@ class University:
         '''this function scans grades.txt in the given path of the univeristy for valid sets of grade information and adds them to the repository'''
         for stu_CWID, course, grade, inst_CWID in file_reader(os.path.join(self.path, 'grades.txt'), 4, '\t'):
             course = course.upper()
-            if self._students[stu_CWID].add_course(course, grade):
+            if self._students[stu_CWID].add_course(course, grade.upper()):
                 self._instructors[inst_CWID].add_student(course)  # in case of duplicate or updated student grade entries
 
     def import_majors(self):
