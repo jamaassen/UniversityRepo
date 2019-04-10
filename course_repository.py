@@ -118,7 +118,7 @@ class Major:
 
     def get_summary(self):
         '''This function provides a summary of Major information. Fields are as defined in get_field_names()'''
-        return (self.name, list(self._required), list(self._electives))
+        return (self.name, sorted(self._required), sorted(self._electives))
 
 
 class University:
