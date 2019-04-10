@@ -48,7 +48,6 @@ class Student:
         ''' return True/False if the two Students are equivalent '''
         return self._CWID == other._CWID
 
-    @property
     @staticmethod
     def get_field_names():
         '''This function provides the labels for the fields that are returned in get_summary()'''
@@ -81,7 +80,6 @@ class Instructor:
         ''' return True/False if the two Instructors are equivalent '''
         return self._CWID == other._CWID
 
-    @property
     @staticmethod
     def get_field_names():
         '''This function provides the labels for the fields that are returned in get_summary()'''
@@ -137,14 +135,14 @@ class University:
 
     def student_pt(self):
         '''This function provides a PrettyTable summary of all student data'''
-        stu_sum = PrettyTable(field_names=Student.get_field_names)
+        stu_sum = PrettyTable(field_names=Student.get_field_names())
         for stu in self._students.values():
             stu_sum.add_row(stu.get_summary())
         return stu_sum
 
     def instructor_pt(self):
         '''This function provides a PrettyTable summary of all instructor data'''
-        inst_sum = PrettyTable(field_names=Instructor.get_field_names)
+        inst_sum = PrettyTable(field_names=Instructor.get_field_names())
         for inst in self._instructors.values():
             for line in inst.get_summary():
                 inst_sum.add_row(line)
@@ -161,12 +159,12 @@ class University:
 
 if __name__ == '__main__':
     path = input('University directory should contain students.txt, instructor.txt, and grades.txt\nPlease provide the directory for the university: ')
-    if not os.path.isdir(path):
+    if not os.path.isdir(os.path.abspath(path)):
         print(f"{os.path.abspath(path)} is not a valid directory")
     else:
         name = input(f'Please provide the University name or hit enter to accept "{os.path.basename(os.path.abspath(path))}" as the name')
         try:
-            repo = University(path)
+            repo = University(os.path.abspath(path))
         except FileNotFoundError as e:
             print(f'File Error: Could not read/find "{os.path.basename(e.filename)}" in "{os.path.dirname(os.path.abspath(path))}"')
         except ValueError as e:
