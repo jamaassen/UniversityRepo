@@ -37,14 +37,12 @@ def file_reader(path, num_fields, sep=',', header=False):
 
 class Student:
     ''' this class stores information about a student'''
-    def __init__(self, CWID, name, major, required, electives):
+    def __init__(self, CWID, name, major):
         '''Student Constructor'''
         self._CWID = CWID
         self._name = name
         self._major = major
         self._courses = {}  # key = UPPER course string, value = grade string
-        self._required = required
-        self._electives = electives
 
     def __eq__(self, other):
         ''' return True/False if the two Students are equivalent '''
@@ -57,13 +55,10 @@ class Student:
 
     def get_summary(self):
         '''This function provides a summary of student information. Fields are as defined in get_field_names()'''
-        passing_grade = ('A', 'A-', 'B+', 'B', 'B-', 'C+', 'C')
-        completed = sorted(course for course, grade in self._courses.items() if grade in passing_grade)
-        remaining = self._required - {course for course, grade in self._courses.items() if grade in passing_grade}
-        electives = self._electives.intersection({course for course, grade in self._courses.items() if grade in passing_grade})
-        return (self._CWID, self._name, self._major, completed,
-                remaining if any(remaining) else 'None',
-                'None' if any(electives) else self._electives)
+        return (self._CWID, self._name, self._major.name,
+                self._major.check_completed(self._courses),
+                self._major.get_required_remaining(self._courses),
+                self._major.get_electives_remaining(self._courses))
 
     def add_course(self, course, grade):
         '''adds a course and grade to the student's course list. Returns True if this is new course for the student, False if they already had it'''
@@ -105,10 +100,15 @@ class Instructor:
 
 class Major:
     ''' this class stores information about an Major'''
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, name, passing_grade=('A', 'A-', 'B+', 'B', 'B-', 'C+', 'C')):
+        self._name = name
         self._required = set()
         self._electives = set()
+        self._passing_grade = passing_grade
+
+    @property
+    def name(self):
+        return self._name
 
     @staticmethod
     def get_field_names():
@@ -124,11 +124,16 @@ class Major:
         else:
             raise ValueError(f'Invalid course type "{course_type}" provided')
 
-    def get_required(self):
-        return self._required
+    def check_completed(self, course_grades):
+        return sorted(course for course, grade in course_grades.items() if grade in self._passing_grade)
 
-    def get_electives(self):
-        return self._electives
+    def get_required_remaining(self, course_grades):
+        remaining = self._required - {course for course, grade in course_grades.items() if grade in self._passing_grade}
+        return remaining if any(remaining) else 'None'
+
+    def get_electives_remaining(self, course_grades):
+        electives_taken = self._electives.intersection({course for course, grade in course_grades.items() if grade in self._passing_grade})
+        return 'None' if any(electives_taken) else self._electives
 
     def get_summary(self):
         '''This function provides a summary of Major information. Fields are as defined in get_field_names()'''
@@ -161,7 +166,7 @@ class University:
     def import_students(self):
         '''this function scans students.txt in the given path of the univeristy for valid students and adds them to the repository'''
         for CWID, name, major in file_reader(os.path.join(self.path, 'students.txt'), 3, '\t'):
-            self._students[CWID] = Student(CWID, name.title(), major.upper(), self._majors[major.upper()].get_required(), self._majors[major.upper()].get_electives())
+            self._students[CWID] = Student(CWID, name.title(), self._majors[major.upper()])
 
     def import_instructors(self):
         '''this function scans instructors.txt in the given path of the univeristy for valid instructors and adds them to the repository'''
