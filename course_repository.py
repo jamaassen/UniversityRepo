@@ -97,20 +97,28 @@ class Instructor:
 
 class Major:
     ''' this class stores information about an Major'''
-    def __init__(self):
-
+    def __init__(self, name):
+        self.name = name
         self._required = set()
         self._electives = set()
 
+    @staticmethod
+    def get_field_names():
+        '''This function provides the labels for the fields that are returned in get_summary()'''
+        return("Dept", "Required", "Electives")
+
     def add_course(self, course_type, course):
         '''this method adds the provided course to the list of courses of the provided type for the calling Major'''
-        self._required.add(course)
+        if course_type == 'R':
+            self._required.add(course)
+        elif course_type == 'E':
+            self._electives.add(course)
+        else:
+            raise ValueError(f'Invalid course type "{course_type}" provided')
 
-    def get_required(self):
-        return tuple(self._required)
-
-    def get_electives(self):
-        return tuple(self._electives)
+    def get_summary(self):
+        '''This function provides a summary of Major information. Fields are as defined in get_field_names()'''
+        return (self.name, list(self._required), list(self._electives))
 
 
 class University:
@@ -126,7 +134,7 @@ class University:
         self.path = path
         self._students = {}  # key = CWID, value = Student instances
         self._instructors = {}  # key = CWID, value = Instructor instances
-        self._majors = defaultdict(Major)  # key = dept name, value = major instances
+        self._majors = {}  # key = dept name, value = major instances
 
         if not os.path.isdir(path):
             raise FileNotFoundError(f"{os.path.abspath(path)} is not a valid directory")
@@ -156,9 +164,9 @@ class University:
     def import_majors(self):
         '''this function scans majors.txt in the given path of the univeristy for valid sets of major information and adds them to the repository'''
         for dept, course_type, course in file_reader(os.path.join(self.path, 'majors.txt'), 3, '\t'):
+            if dept not in self._majors:
+                self._majors[dept] = Major(dept)
             self._majors[dept].add_course(course_type.upper(), course.upper())
-        for dept, major in self._majors.items():
-            print(dept, major.get_required(), major.get_required())
 
     def student_pt(self):
         '''This function provides a PrettyTable summary of all student data'''
@@ -175,8 +183,16 @@ class University:
                 inst_sum.add_row(line)
         return inst_sum
 
+    def major_pt(self):
+        major_sum = PrettyTable(field_names=Major.get_field_names())
+        for major in self._majors.values():
+            major_sum.add_row(major.get_summary())
+        return major_sum
+
     def __str__(self):
         results = [f'Summary for {self.name}']
+        results.append('Majors Summary')
+        results.append(self.major_pt().get_string())
         results.append('Student Summary')
         results.append(self.student_pt().get_string())
         results.append('Instructor Summary')
