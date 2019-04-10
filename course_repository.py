@@ -95,6 +95,24 @@ class Instructor:
         self._courses[course] += count
 
 
+class Major:
+    ''' this class stores information about an Major'''
+    def __init__(self):
+
+        self._required = set()
+        self._electives = set()
+
+    def add_course(self, course_type, course):
+        '''this method adds the provided course to the list of courses of the provided type for the calling Major'''
+        self._required.add(course)
+
+    def get_required(self):
+        return tuple(self._required)
+
+    def get_electives(self):
+        return tuple(self._electives)
+
+
 class University:
     '''This class stores information about a particular University'''
     def __init__(self, path, name='Default_University_Name'):
@@ -108,6 +126,7 @@ class University:
         self.path = path
         self._students = {}  # key = CWID, value = Student instances
         self._instructors = {}  # key = CWID, value = Instructor instances
+        self._majors = defaultdict(Major)  # key = dept name, value = major instances
 
         if not os.path.isdir(path):
             raise FileNotFoundError(f"{os.path.abspath(path)} is not a valid directory")
@@ -115,6 +134,7 @@ class University:
         self.import_students()
         self.import_instructors()
         self.import_grades()
+        self.import_majors()
 
     def import_students(self):
         '''this function scans students.txt in the given path of the univeristy for valid students and adds them to the repository'''
@@ -132,6 +152,13 @@ class University:
             course = course.upper()
             if self._students[stu_CWID].add_course(course, grade):
                 self._instructors[inst_CWID].add_student(course)  # in case of duplicate or updated student grade entries
+
+    def import_majors(self):
+        '''this function scans majors.txt in the given path of the univeristy for valid sets of major information and adds them to the repository'''
+        for dept, course_type, course in file_reader(os.path.join(self.path, 'majors.txt'), 3, '\t'):
+            self._majors[dept].add_course(course_type.upper(), course.upper())
+        for dept, major in self._majors.items():
+            print(dept, major.get_required(), major.get_required())
 
     def student_pt(self):
         '''This function provides a PrettyTable summary of all student data'''
