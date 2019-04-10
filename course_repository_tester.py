@@ -50,7 +50,13 @@ class CourseRepoTest(unittest.TestCase):
                     'SYEN',
                     ['SYS 612', 'SYS 671', 'SYS 800'],
                     'None',
-                    {'SSW 565', 'SSW 540', 'SSW 810'})}
+                    {'SSW 565', 'SSW 540', 'SSW 810'}),
+            '105': ('105',
+                    'Cool, J',
+                    'THTBS',
+                    ['SYS 800'],
+                    'Unknown Major',
+                    'Unknown Major')}
         self.assertEqual(test_students, actual_students)
 
         actual_instructors = {CWID: set(inst.get_summary()) for CWID, inst in repo._instructors.items()}
@@ -63,7 +69,7 @@ class CourseRepoTest(unittest.TestCase):
                     ('201', 'Feynman, R', 'SFEN', 'SSW 564', 2),
                     ('201', 'Feynman, R', 'SFEN', 'SYS 612', 1),
                     ('201', 'Feynman, R', 'SFEN', 'SYS 671', 1),
-                    ('201', 'Feynman, R', 'SFEN', 'SYS 800', 1)}}
+                    ('201', 'Feynman, R', 'SFEN', 'SYS 800', 2)}}
         self.assertEqual(test_instructors, actual_instructors)
 
         actual_majors = {name: major.get_summary() for name, major in repo._majors.items()}
