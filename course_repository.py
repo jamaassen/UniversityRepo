@@ -20,7 +20,7 @@ def file_reader(path, num_fields, sep=',', header=False):
     -raises ValueError on incorrectly formatted dsv file
     -strips whitespace from outer edges of all returned fields
     '''
-    with open(path, 'r') as fp:  # intenionally avoiding try/except so that file exceptions are raised to caller
+    with open(path, 'r') as fp:  # intentionally avoiding try/except so that file exceptions are raised to caller
         fp_it = iter(enumerate(fp))
         if header:
             try:
@@ -42,7 +42,7 @@ class Student:
         self._CWID = CWID
         self._name = name
         self._major = major
-        self._classes = {}  # key = UPPER course string, value = grade string
+        self._courses = {}  # key = UPPER course string, value = grade string
 
     def __eq__(self, other):
         ''' return True/False if the two Students are equivalent '''
@@ -51,19 +51,29 @@ class Student:
     @staticmethod
     def get_field_names():
         '''This function provides the labels for the fields that are returned in get_summary()'''
-        return ('CWID', 'Name', 'Completed Courses')
+        return ('CWID', 'Name', 'Major', 'Completed Courses', 'Remaining Required', 'Remaining Electives')
 
     def get_summary(self):
         '''This function provides a summary of student information. Fields are as defined in get_field_names()'''
-        return (self._CWID, self._name, sorted(self._classes.keys()))
+        if type(self._major) is str:
+            dept = self._major
+            completed = sorted(course for course, grade in self._courses.items() if grade in ('A', 'A-', 'B+', 'B', 'B-', 'C+', 'C'))
+            req_remain = "Unknown Major"
+            elec_remain = "Unknown Major"
+        else:
+            dept = self._major.name
+            completed = self._major.check_completed(self._courses)
+            req_remain = self._major.get_required_remaining(self._courses)
+            elec_remain = self._major.get_electives_remaining(self._courses)
+        return (self._CWID, self._name, dept, completed, req_remain, elec_remain)
 
     def add_course(self, course, grade):
         '''adds a course and grade to the student's course list. Returns True if this is new course for the student, False if they already had it'''
-        if course in self._classes:
-            self._classes[course] = grade
+        if course in self._courses:
+            self._courses[course] = grade
             return False
         else:
-            self._classes[course] = grade
+            self._courses[course] = grade
             return True
 
 
@@ -95,6 +105,51 @@ class Instructor:
         self._courses[course] += count
 
 
+class Major:
+    ''' this class stores information about an Major'''
+    def __init__(self, name, passing_grade=('A', 'A-', 'B+', 'B', 'B-', 'C+', 'C')):
+        self._name = name
+        self._required = set()
+        self._electives = set()
+        self._passing_grade = passing_grade
+
+    @property
+    def name(self):
+        return self._name
+
+    @staticmethod
+    def get_field_names():
+        '''This function provides the labels for the fields that are returned in get_summary()'''
+        return("Dept", "Required", "Electives")
+
+    def add_course(self, course_type, course):
+        '''this method adds the provided course to the list of courses of the provided type for the calling Major'''
+        if course_type == 'R':
+            self._required.add(course)
+        elif course_type == 'E':
+            self._electives.add(course)
+        else:
+            raise ValueError(f'Invalid course type "{course_type}" provided')
+
+    def check_completed(self, course_grades):
+        '''This function checks with major if the completed courses have a good enough grade to count, returns a sorted list of compelted courses'''
+        return sorted(course for course, grade in course_grades.items() if grade in self._passing_grade)
+
+    def get_required_remaining(self, course_grades):
+        '''This function checks with the major what required courses are remaining to be taken'''
+        remaining = self._required - {course for course, grade in course_grades.items() if grade in self._passing_grade}
+        return remaining if any(remaining) else 'None'
+
+    def get_electives_remaining(self, course_grades):
+        '''This function checks with the major what Electives can be taken to fulfill requirements, or "None" if completed'''
+        electives_taken = self._electives.intersection({course for course, grade in course_grades.items() if grade in self._passing_grade})
+        return 'None' if any(electives_taken) else self._electives
+
+    def get_summary(self):
+        '''This function provides a summary of Major information. Fields are as defined in get_field_names()'''
+        return (self.name, sorted(self._required), sorted(self._electives))
+
+
 class University:
     '''This class stores information about a particular University'''
     def __init__(self, path, name='Default_University_Name'):
@@ -108,10 +163,12 @@ class University:
         self.path = path
         self._students = {}  # key = CWID, value = Student instances
         self._instructors = {}  # key = CWID, value = Instructor instances
+        self._majors = {}  # key = dept name, value = major instances
 
         if not os.path.isdir(path):
             raise FileNotFoundError(f"{os.path.abspath(path)} is not a valid directory")
 
+        self.import_majors()
         self.import_students()
         self.import_instructors()
         self.import_grades()
@@ -119,7 +176,7 @@ class University:
     def import_students(self):
         '''this function scans students.txt in the given path of the univeristy for valid students and adds them to the repository'''
         for CWID, name, major in file_reader(os.path.join(self.path, 'students.txt'), 3, '\t'):
-            self._students[CWID] = Student(CWID, name.title(), major.upper())
+            self._students[CWID] = Student(CWID, name.title(), self._majors.get(major.upper(), major.upper()))
 
     def import_instructors(self):
         '''this function scans instructors.txt in the given path of the univeristy for valid instructors and adds them to the repository'''
@@ -130,8 +187,15 @@ class University:
         '''this function scans grades.txt in the given path of the univeristy for valid sets of grade information and adds them to the repository'''
         for stu_CWID, course, grade, inst_CWID in file_reader(os.path.join(self.path, 'grades.txt'), 4, '\t'):
             course = course.upper()
-            if self._students[stu_CWID].add_course(course, grade):
+            if self._students[stu_CWID].add_course(course, grade.upper()) and inst_CWID in self._instructors:
                 self._instructors[inst_CWID].add_student(course)  # in case of duplicate or updated student grade entries
+
+    def import_majors(self):
+        '''this function scans majors.txt in the given path of the univeristy for valid sets of major information and adds them to the repository'''
+        for dept, course_type, course in file_reader(os.path.join(self.path, 'majors.txt'), 3, '\t'):
+            if dept not in self._majors:
+                self._majors[dept] = Major(dept)
+            self._majors[dept].add_course(course_type.upper(), course.upper())
 
     def student_pt(self):
         '''This function provides a PrettyTable summary of all student data'''
@@ -148,8 +212,17 @@ class University:
                 inst_sum.add_row(line)
         return inst_sum
 
+    def major_pt(self):
+        '''This function provides a PrettyTable summary of all major data'''
+        major_sum = PrettyTable(field_names=Major.get_field_names())
+        for major in self._majors.values():
+            major_sum.add_row(major.get_summary())
+        return major_sum
+
     def __str__(self):
         results = [f'Summary for {self.name}']
+        results.append('Majors Summary')
+        results.append(self.major_pt().get_string())
         results.append('Student Summary')
         results.append(self.student_pt().get_string())
         results.append('Instructor Summary')
