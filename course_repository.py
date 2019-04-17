@@ -10,8 +10,9 @@ Created 3/31/2019
 '''
 
 import os
-from prettytable import PrettyTable
+from prettytable import PrettyTable, from_db_cursor
 from collections import defaultdict
+import sqlite3
 
 
 def file_reader(path, num_fields, sep=',', header=False):
@@ -231,16 +232,15 @@ class University:
 
 
 if __name__ == '__main__':
-    path = input('University directory should contain students.txt, instructor.txt, and grades.txt\nPlease provide the directory for the university: ')
-    if not os.path.isdir(os.path.abspath(path)):
-        print(f"{os.path.abspath(path)} is not a valid directory")
-    else:
-        name = input(f'Please provide the University name or hit enter to accept "{os.path.basename(os.path.abspath(path))}" as the name')
-        try:
-            repo = University(os.path.abspath(path))
-        except FileNotFoundError as e:
-            print(f'File Error: Could not read/find "{os.path.basename(e.filename)}" in "{os.path.dirname(os.path.abspath(path))}"')
-        except ValueError as e:
-            print(f'File format error: ' + str(e))
-        else:
-            print(repo)
+    DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'UniversityRepo.sqlite')
+    print(DB_FILE)
+    db = sqlite3.connect(DB_FILE)
+    with db:
+        cur = db.cursor()
+        cur.execute("""
+                    select i.cwid, i.name, i.Dept, g.course, count(*) as students
+                    from HW11_instructors as i
+                    join HW11_grades as g on i.CWID=g.Instructor_CWID
+                    group by i.cwid, g.course order by i.CWID desc;""")
+        inst_table = from_db_cursor(cur)
+    print(inst_table)
