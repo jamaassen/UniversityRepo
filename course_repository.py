@@ -13,6 +13,8 @@ import os
 from prettytable import PrettyTable, from_db_cursor
 from collections import defaultdict
 import sqlite3
+from flask import Flask, render_template
+app = Flask(__name__)
 
 
 def file_reader(path, num_fields, sep=',', header=False):
@@ -231,16 +233,30 @@ class University:
         return '\n'.join(results)
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
+@app.route('/')
+def redirect():
+    return"""<!DOCTYPE html>
+                <html>
+                    <head>
+                        <meta http-equiv="Refresh" content="0; url=./instructor_courses" />
+                    </head>
+                </html>"""
+
+
+@app.route('/instructor_courses')
+def inst_table():
     DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'UniversityRepo.sqlite')
-    print(DB_FILE)
     db = sqlite3.connect(DB_FILE)
     with db:
         cur = db.cursor()
-        cur.execute("""
-                    select i.cwid, i.name, i.Dept, g.course, count(*) as students
+        course_list = cur.execute("""
+                    select i.cwid, i.name, i.Dept as Department, g.course as Courses, count(*) as Students
                     from HW11_instructors as i
                     join HW11_grades as g on i.CWID=g.Instructor_CWID
                     group by i.cwid, g.course order by i.CWID desc;""")
-        inst_table = from_db_cursor(cur)
-    print(inst_table)
+        column_names = [d[0] for d in cur.description]
+
+    return render_template('instructors.html', title='Stevens Respository', table_title='Number of students by course and instructor', column_names=column_names, course_list=course_list)
+
+app.run()
